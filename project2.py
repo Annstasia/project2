@@ -236,7 +236,7 @@ Soldier(evil, (300, 225)).set_image('soldiere.png')
 Soldier(evil, (300, 350)).set_image('soldiere.png')
 Soldier(evil, (300, 475)).set_image('soldiere.png')
 
-
+points = 0
 screen2 = pygame.Surface(aristocrat1.image.get_size())
 running = True
 need_setting = [king, aristocrat1, aristocrat2, soldier1, soldier2, soldier3, soldier4]
@@ -267,17 +267,19 @@ while running:
                             for i in evil:
                                 if i.get_name() == 'King':
                                     # i.attack = [aristocrat1, king]
-                                    i.attack = random.shuffle([aristocrat1, aristocrat2, king])
+                                    i.attack = [aristocrat1, aristocrat2, king]
+                                    random.shuffle(i.attack)
                                     # random.shuffle(i.attack)
                                 if i.get_name() == 'Aristocrat':
-                                    i.attack = random.shuffle(
-                                        [aristocrat1, aristocrat2, soldier1, soldier2, soldier3, soldier3])
+
+                                    i.attack = [aristocrat1, aristocrat2, soldier1, soldier2, soldier3, soldier4]
+                                    random.shuffle(i.attack)
                                     # i.attack = [aristocrat1]
                                     '''i.attack = random.shuffle(
                                         [aristocrat1])'''
                                 if i.get_name() == 'Soldier':
-                                    i.attack = random.shuffle(
-                                        [king, soldier1, soldier2, soldier3, soldier3])
+                                    i.attack = [king, soldier1, soldier2, soldier3, soldier4]
+                                    random.shuffle(i.attack)
                                     # i.attack = [king]
                                 # i.radius = random.choice([40, 80, 120, 160, 200])
                                 i.radius = random.choice([40, 80, 120, 160, 200])
