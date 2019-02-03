@@ -108,7 +108,6 @@ class King(Figure):
 
     def move(self, tick):
         try:
-
             need_run = {}
             for i in self.opposition:
                 if i.get_name() == 'Soldier' and (
@@ -335,6 +334,27 @@ class Exit(pygame.sprite.Sprite):
         screen.blit(self.image, (0, 0))
 
 
+class Particle(pygame.sprite.Sprite):
+    # сгенерируем частицы разного размера
+    #fire = [load_image("star.png")]
+    #for scale in (5, 10, 20):
+    #    fire.append(pygame.transform.scale(fire[0], (scale, scale)))
+
+    def __init__(self, pos, dx, dy, name):
+        super().__init__(particles_sprites)
+        self.image = load_image(name, -1)
+        self.rect = self.image.get_rect()
+        self.velocity = [dx, dy]
+        self.rect.x, self.rect.y = pos
+        self.startX, self.startY = pos
+
+    def update(self):
+        self.rect.x += self.velocity[0]
+        self.rect.y += self.velocity[1]
+        # убиваем, если частица ушла за экран
+        # print(self.velocity)
+        if (self.startX - self.rect.x) ** 2 + (self.startY - self.rect.y) ** 2 > 900:
+            self.kill()
 
 
 def setting():
@@ -362,7 +382,6 @@ def setting():
     return [king, aristocrat1, aristocrat2, soldier1, soldier2, soldier3, soldier4]
 
 
-
 def evilShuffle():
     for i in evil:
         random.shuffle(i.attack)
@@ -386,6 +405,8 @@ def showResult():
     text = font.render('level: ' + str(level), 1, (255, 255, 255))
     screen.blit(text, (3 * sizeX // 8 + (sizeX // 4 - text.get_rect()[2]) // 2,
                        4 * sizeY // 8 + (sizeY // 8 - text.get_rect()[3]) // 2))
+
+
 def set_skins(number):
     startX, startY = 100, 100
     for i in range(number):
@@ -397,6 +418,16 @@ def set_skins(number):
             startX += skin.w + 100
         if bought.get(str(i), 'False') == 'True':
             skin.bought = True
+
+
+def create_particles(position, name):
+    particle_count = 20
+    numbers = range(-5, 6)
+    for _ in range(particle_count):
+        i, j = random.choice(numbers), random.choice(numbers)
+        while i == j == 0:
+            i, j = random.choice(numbers), random.choice(numbers)
+        Particle(position, i, j, name)
 
 
 pygame.init()
@@ -413,6 +444,7 @@ sizeX, sizeY = ctypes.windll.user32.GetSystemMetrics(0) - 100, ctypes.windll.use
 screen = pygame.display.set_mode((sizeX, sizeY))
 menu = pygame.sprite.Group()
 skins = pygame.sprite.Group()
+particles_sprites = pygame.sprite.Group()
 SkinMenu(menu)
 ButtonStart(menu)
 Sound(menu)
@@ -454,71 +486,74 @@ while running:
                 if i.get_name() != 'Exit':
                     file.writelines(i.localpath + ' ' + str(i.bought) + '\n')
             file.close()
-
-        if state == 0 and event.type == pygame.MOUSEBUTTONDOWN:
-            if choose_diapason:
-                for i in diapason:
-                    if i.get_click(event.pos):
-                        need_setting[0].radius = i.radius
-                        del need_setting[0]
-                        if len(need_setting) == 0:
-                            state = 1
-                            clock.tick()
-                        should_write = [should_write[0]]
-                        choose_diapason = False
-            elif bool(need_setting):
-                for i in evil:
-                    if i.get_click(event.pos):
-                        ok, full = need_setting[0].set_aims(i)
-                        if full:
-                            choose_diapason = True
-                        if ok:
-                            should_write.append([i.rect[:2],  str(ok)])
         if state == 1 and event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
             index = (index + 1) % len(playerList)
             while playerList[index] not in player:
                 index = (index + 1) % len(playerList)
-        if state == 2 and event.type == pygame.MOUSEBUTTONDOWN:
-            clock.tick()
-            pygame.mixer.music.play(-1)
-            state = 0
-            player = pygame.sprite.Group()
-            evil = pygame.sprite.Group()
-            playerList = setting()
-            evilList = [i for i in evil]
-            evilShuffle()
-            need_setting = playerList.copy()
-            ok, full, choose_diapason = False, False, False
-            was = 0
-            should_write[0][1] = 0
-        if state == 3 and event.type == pygame.MOUSEBUTTONDOWN:
-            answer = ''
-            for i in menu:
-                if i.get_name() == 'Sound':
-                    sound_volume = i.get_click(event.pos)
-                    pygame.mixer.music.set_volume(sound_volume)
-                    winSound.set_volume(0.5 * sound_volume)
-                    collisionSound.set_volume(sound_volume)
-                    loseSound.set_volume(sound_volume)
-                else:
-                    state = i.get_click(event.pos)
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            create_particles(event.pos, 'star.png')
             if state == 0:
+                if choose_diapason:
+                    for i in diapason:
+                        if i.get_click(event.pos):
+                            need_setting[0].radius = i.radius
+                            del need_setting[0]
+                            if len(need_setting) == 0:
+                                state = 1
+                                clock.tick()
+                            should_write = [should_write[0]]
+                            choose_diapason = False
+                elif bool(need_setting):
+                    for i in evil:
+                        if i.get_click(event.pos):
+                            ok, full = need_setting[0].set_aims(i)
+                            if full:
+                                choose_diapason = True
+                            if ok:
+                                should_write.append([i.rect[:2],  str(ok)])
+            if state == 2:
+                clock.tick()
+                pygame.mixer.music.play(-1)
+                state = 0
                 player = pygame.sprite.Group()
                 evil = pygame.sprite.Group()
                 playerList = setting()
                 evilList = [i for i in evil]
                 evilShuffle()
-                screen2 = pygame.Surface(playerList[0].image.get_size())
                 need_setting = playerList.copy()
-                clock.tick()
-        if state == 4 and event.type == pygame.MOUSEBUTTONDOWN:
-            for i in skins:
-                if i.get_name() == 'Exit':
-                    state = i.get_click(event.pos)
-                else:
-                    localpath, answer, points = i.get_click(event.pos, points)
-        if state != 3 and event.type == pygame.MOUSEBUTTONDOWN:
-            state = exit.get_click(event.pos)
+                ok, full, choose_diapason = False, False, False
+                was = 0
+                should_write[0][1] = 0
+            if state == 3:
+                answer = ''
+                for i in menu:
+                    if i.get_name() == 'Sound':
+                        sound_volume = i.get_click(event.pos)
+                        pygame.mixer.music.set_volume(sound_volume)
+                        winSound.set_volume(0.5 * sound_volume)
+                        collisionSound.set_volume(sound_volume)
+                        loseSound.set_volume(sound_volume)
+                    else:
+                        state = i.get_click(event.pos)
+                if state == 0:
+                    player = pygame.sprite.Group()
+                    evil = pygame.sprite.Group()
+                    playerList = setting()
+                    evilList = [i for i in evil]
+                    evilShuffle()
+                    screen2 = pygame.Surface(playerList[0].image.get_size())
+                    need_setting = playerList.copy()
+                    clock.tick()
+            if state == 4:
+                for i in skins:
+                    if i.get_name() == 'Exit':
+                        state = i.get_click(event.pos)
+                    else:
+                        localpath, answer, points = i.get_click(event.pos, points)
+            if state != 3:
+                state = exit.get_click(event.pos)
+    particles_sprites.update()
+    particles_sprites.draw(screen)
     if state == 0:
         write((50, int(4 * sizeY / 5 + playerList[0].image.get_size()[1])), need_setting[0].ask_setting())
         screen2.fill((0, 255, 0))
@@ -577,14 +612,18 @@ while running:
                             delet = random.choice([i, j])
                             if delet == i:
                                 player.remove(i)
+                                create_particles(i.rect[:2], 'killStar.png')
                                 should_write[0][1] -= i.velocity * 2
                             else:
                                 should_write[0][1] += j.velocity * 2
+                                create_particles(j.rect[:2], 'killStar.png')
                                 evil.remove(j)
                         else:
                             should_write[0][1] += j.velocity * 2
+                            create_particles(j.rect[:2], 'killStar.png')
                             evil.remove(j)
                     else:
+                        create_particles(i.rect[:2], 'killStar.png')
                         should_write[0][1] -= i.velocity * 2
                         player.remove(i)
         screen2.fill((0, 255, 255))
@@ -594,8 +633,8 @@ while running:
             was += 1 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! delet
             player, evil = pygame.sprite.Group(), pygame.sprite.Group()
             if was == 12:
+                points = min(points + should_write[0][1], 0)
                 if should_write[0][1] > 0:
-                    points += should_write[0][1]
                     level += 1
                 state = 2
             else:
