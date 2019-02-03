@@ -83,9 +83,6 @@ class Figure(pygame.sprite.Sprite):
         self.rect[:2] = self.new_coords
 
 
-
-
-
 class King(Figure):
     def __init__(self, group, pos):
         super().__init__(group, pos, load_image('king.png', -1, localpath), 400, 20)
@@ -246,6 +243,9 @@ class SkinMenu(pygame.sprite.Sprite):
             return 4
         return state
 
+    def get_name(self):
+        return 'SkinMenu'
+
 class ButtonStart(pygame.sprite.Sprite):
     def __init__(self, group):
         super().__init__(group)
@@ -259,34 +259,57 @@ class ButtonStart(pygame.sprite.Sprite):
             return 0
         return state
 
+    def get_name(self):
+        return 'ButtonStart'
+
 
 class Sound(pygame.sprite.Sprite):
     def __init__(self, group):
         super().__init__(group)
-        self.image = load_image('sound.png', -1)
+        self.sounds = [load_image('sound100.png', -1), load_image('sound75.png', -1),
+                       load_image('sound50.png', -1), load_image('sound25.png', -1),
+                       load_image('sound0.png', -1)]
+        self.index = 0
+        self.image = self.sounds[self.index]
         self.rect = self.image.get_rect()
-        # self.rect[0] = (sizeX - self.rect[2]) // 2
         self.rect[1] = sizeY - self.rect[3]
     def get_click(self, pos):
-        return state
+        if self.rect[0] <= pos[0] <= self.rect[0] + self.rect[2] \
+                and self.rect[1] <= pos[1] <= self.rect[1] + self.rect[3]:
+            self.index = (self.index + 1) % 5
+            self.image = self.sounds[self.index]
+            return 1 - self.index * 0.25
+        return sound_volume
+
+    def get_name(self):
+        return 'Sound'
 
 
 class Skin(pygame.sprite.Sprite):
-    def __init__(self, group, pos, localpath, level, points):
+    def __init__(self, group, pos, localpath, points):
         super().__init__(group)
         self.localpath = localpath
-        self.level = level
         self.points = points
         self.image = load_image('king.png', -1, localpath)
         self.rect = self.image.get_rect()
         self.rect[:2] = pos
+        font = pygame.font.SysFont('Times New Roman', 20)
+        self.text = font.render(str(points), 1, (255, 255, 255), (15, 155, 200))
+        self.w = max(self.rect[2], self.text.get_size()[0])
+        self.h = self.rect[3] + self.text.get_size()[1]
+        self.bought = False
 
-    def get_click(self, pos, level, points):
+
+    def get_click(self, pos, points):
         if self.rect[0] <= pos[0] <= self.rect[0] + self.rect[2] \
                 and self.rect[1] <= pos[1] <= self.rect[1] + self.rect[3]:
-            if level >= self.level and points >= self.points:
-                return self.localpath
-        return localpath
+            if self.bought:
+                return self.localpath, 'OK', points
+            if points >= self.points:
+                self.bought = True
+                return self.localpath, 'OK', points - self.points
+            return localpath, 'НЕ ХВАТАЕТ ОЧКОВ', points
+        return localpath, answer, points
 
     def get_name(self):
         return 'Skin'
@@ -296,18 +319,20 @@ class Skin(pygame.sprite.Sprite):
 class Exit(pygame.sprite.Sprite):
     def __init__(self, group):
         super().__init__(group)
-        self.image = load_image('exit.png', -1)
+        self.image = load_image('exit.png', None)
         self.rect = self.image.get_rect()
     def get_click(self, pos):
-        print(self.rect, pos)
+        # print(self.rect, pos)
         if self.rect[0] <= pos[0] <= self.rect[0] + self.rect[2] \
                 and self.rect[1] <= pos[1] <= self.rect[1] + self.rect[3]:
-            print('hi')
             return 3
         return state
 
     def get_name(self):
         return 'Exit'
+
+    def draw(self, screen):
+        screen.blit(self.image, (0, 0))
 
 
 
@@ -346,10 +371,13 @@ def evilShuffle():
 
 def showResult():
     if should_write[0][1] < 0:
+        loseSound.play()
         pygame.draw.rect(screen, (255, 0, 0), (3 * sizeX // 8, 3 * sizeY // 8, sizeX // 4, sizeY // 4))
     elif should_write[0][1] == 0:
+        loseSound.play()
         pygame.draw.rect(screen, (0, 0, 255), (3 * sizeX // 8, 3 * sizeY // 8, sizeX // 4, sizeY // 4))
     else:
+        winSound.play()
         pygame.draw.rect(screen, (0, 255, 0), (3 * sizeX // 8, 3 * sizeY // 8, sizeX // 4, sizeY // 4))
     font = pygame.font.SysFont('Times New Roman', 30)
     text = font.render('points: ' + str(should_write[0][1]), 1, (255, 255, 255))
@@ -358,61 +386,75 @@ def showResult():
     text = font.render('level: ' + str(level), 1, (255, 255, 255))
     screen.blit(text, (3 * sizeX // 8 + (sizeX // 4 - text.get_rect()[2]) // 2,
                        4 * sizeY // 8 + (sizeY // 8 - text.get_rect()[3]) // 2))
-    # write((3 * sizeX // 8, 3 * sizeY // 8), should_write[0][1], 50)
+def set_skins(number):
+    startX, startY = 100, 100
+    for i in range(number):
+        skin = Skin(skins, (startX, startY), str(i), i * 5000)
+        if startX + 100 + 2 * skin.w > sizeX:
+            startX = 100
+            startY += 100 + skin.h
+        else:
+            startX += skin.w + 100
+        if bought.get(str(i), 'False') == 'True':
+            skin.bought = True
 
-
-def TESTING():
-    global state
-    # clock = pygame.time.Clock()
-    state = 1
-    for i in player:
-        for j in evil:
-            i.set_aims(j)
 
 pygame.init()
-localpath = ''
+pygame.mixer.init()
+pygame.mixer.music.load('data/backgroundMusic.mp3')
+pygame.mixer.music.play(-1)
+collisionSound = pygame.mixer.Sound('data/collision.wav')
+winSound = pygame.mixer.Sound('data/win2.wav')
+loseSound = pygame.mixer.Sound('data/lose.wav')
+winSound.set_volume(0.5)
+sound_volume = 1
+localpath = '0'
 sizeX, sizeY = ctypes.windll.user32.GetSystemMetrics(0) - 100, ctypes.windll.user32.GetSystemMetrics(1) - 100
 screen = pygame.display.set_mode((sizeX, sizeY))
-# kingImage, soldierImage = load_image('king.png', -1), load_image('soldier.png', -1)
-# aristocratImage = load_image('aristocrat.png', -1)
-# player = pygame.sprite.Group()
-# evil = pygame.sprite.Group()
 menu = pygame.sprite.Group()
 skins = pygame.sprite.Group()
 SkinMenu(menu)
 ButtonStart(menu)
 Sound(menu)
-# playerList = setting()
-# evilList = [i for i in evil]
-# evilShuffle()
-level = 0
-# screen2 = pygame.Surface(playerList[0].image.get_size())
+file = open('data/result.txt', mode='r')
+points, level = map(int, file.read().split())
+file.close()
+file = open('data/bought.txt', mode='r')
+readFile = file.read().split('\n')
+file.close()
+bought = {}
+for i in readFile:
+    if len(i) != 0:
+        bought[i.split()[0]] = i.split()[1]
 running = True
-# need_setting = playerList.copy()
 diapason = pygame.sprite.Group()
-Diapason(diapason, (25, 10), load_image('40.png'), 40)
-Diapason(diapason, (175, 10), load_image('80.png'), 80)
-Diapason(diapason, (325, 10), load_image('120.png'), 120)
-Diapason(diapason, (475, 10), load_image('160.png'), 160)
-Diapason(diapason, (625, 10), load_image('200.png'), 200)
-should_write = [[(0, 0), 0]]
+Diapason(diapason, (125, 0), load_image('40.png'), 40)
+Diapason(diapason, (275, 0), load_image('80.png'), 80)
+Diapason(diapason, (425, 0), load_image('120.png'), 120)
+Diapason(diapason, (575, 0), load_image('160.png'), 160)
+Diapason(diapason, (725, 0), load_image('200.png'), 200)
+should_write = [[(sizeX // 2, 0), 0]]
 index = 0
 was = 0
 state = 3
 ok, full, choose_diapason = False, False, False
 clock = pygame.time.Clock()
-Skin(skins, (100, 100), '0', 0, 0)
-Skin(skins, (100, 300), '1', 0, 0)
-Exit(skins)
-
-# TESTING() # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!DELETE
-#ok, full = True, True !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!DELETE
-# need_setting, state, clock = [], 1, pygame.time.Clock() # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!delete
+set_skins(12)
+exit = Exit(skins)
 while running:
     screen.fill((0, 0, 0))
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+            file = open('data/result.txt', mode='w')
+            file.write(str(points) + ' ' + str(level))
+            file.close()
+            file = open('data/bought.txt', mode='w')
+            for i in skins:
+                if i.get_name() != 'Exit':
+                    file.writelines(i.localpath + ' ' + str(i.bought) + '\n')
+            file.close()
+
         if state == 0 and event.type == pygame.MOUSEBUTTONDOWN:
             if choose_diapason:
                 for i in diapason:
@@ -421,7 +463,6 @@ while running:
                         del need_setting[0]
                         if len(need_setting) == 0:
                             state = 1
-                            # clock = pygame.time.Clock()
                             clock.tick()
                         should_write = [should_write[0]]
                         choose_diapason = False
@@ -431,8 +472,6 @@ while running:
                         ok, full = need_setting[0].set_aims(i)
                         if full:
                             choose_diapason = True
-                            '''del need_setting[0]
-                            should_write = []'''
                         if ok:
                             should_write.append([i.rect[:2],  str(ok)])
         if state == 1 and event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
@@ -441,6 +480,7 @@ while running:
                 index = (index + 1) % len(playerList)
         if state == 2 and event.type == pygame.MOUSEBUTTONDOWN:
             clock.tick()
+            pygame.mixer.music.play(-1)
             state = 0
             player = pygame.sprite.Group()
             evil = pygame.sprite.Group()
@@ -450,11 +490,18 @@ while running:
             need_setting = playerList.copy()
             ok, full, choose_diapason = False, False, False
             was = 0
-            TESTING()
-            state, need_setting = 1, []  #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            should_write[0][1] = 0
         if state == 3 and event.type == pygame.MOUSEBUTTONDOWN:
+            answer = ''
             for i in menu:
-                state = i.get_click(event.pos)
+                if i.get_name() == 'Sound':
+                    sound_volume = i.get_click(event.pos)
+                    pygame.mixer.music.set_volume(sound_volume)
+                    winSound.set_volume(0.5 * sound_volume)
+                    collisionSound.set_volume(sound_volume)
+                    loseSound.set_volume(sound_volume)
+                else:
+                    state = i.get_click(event.pos)
             if state == 0:
                 player = pygame.sprite.Group()
                 evil = pygame.sprite.Group()
@@ -463,23 +510,20 @@ while running:
                 evilShuffle()
                 screen2 = pygame.Surface(playerList[0].image.get_size())
                 need_setting = playerList.copy()
-                TESTING()
                 clock.tick()
         if state == 4 and event.type == pygame.MOUSEBUTTONDOWN:
             for i in skins:
-
                 if i.get_name() == 'Exit':
                     state = i.get_click(event.pos)
                 else:
-                    localpath = i.get_click(event.pos, level, should_write[0][1])
-
-
+                    localpath, answer, points = i.get_click(event.pos, points)
+        if state != 3 and event.type == pygame.MOUSEBUTTONDOWN:
+            state = exit.get_click(event.pos)
     if state == 0:
-        # clock.tick()
-        # TESTING()
         write((50, int(4 * sizeY / 5 + playerList[0].image.get_size()[1])), need_setting[0].ask_setting())
         screen2.fill((0, 255, 0))
         screen.blit(screen2, (need_setting[0].rect[:2]))
+        exit.draw(screen)
     if state == 1:
         tick = clock.tick() / 1000
         keys = pygame.key.get_pressed()
@@ -487,13 +531,20 @@ while running:
             index = (index + 1) % len(playerList)
         if keys[pygame.K_DOWN]:
             playerList[index].new_coords[1] += tick * playerList[index].velocity
-            # playerList[index].new_coords[1] += playerList[index].velocity // 20
         if keys[pygame.K_UP]:
             playerList[index].new_coords[1] -= tick * playerList[index].velocity * 2
         if keys[pygame.K_RIGHT]:
             playerList[index].new_coords[0] += tick * playerList[index].velocity * 2
         if keys[pygame.K_LEFT]:
             playerList[index].new_coords[0] -= tick * playerList[index].velocity * 2
+        if playerList[index].new_coords[0] > sizeX - playerList[index].rect[2]:
+            playerList[index].new_coords[0] = sizeX - playerList[index].rect[2]
+        elif playerList[index].new_coords[0] < 0:
+            playerList[index].new_coords[0] = 0
+        if playerList[index].new_coords[1] > sizeY - playerList[index].rect[3]:
+            playerList[index].new_coords[1] = sizeY - playerList[index].rect[3]
+        elif playerList[index].new_coords[1] < 0:
+            playerList[index].new_coords[1] = 0
         for i in player:
             if i != playerList[index]:
                 i.move(tick)
@@ -505,6 +556,7 @@ while running:
             if i != playerList[index]:
                 player.remove(i)
                 for j in pygame.sprite.spritecollide(i, player, False):
+                    collisionSound.play()
                     i.run(j, 0.5, reverse=True, ma=True)
                 player.add(i)
         player.update()
@@ -512,12 +564,14 @@ while running:
             evil.remove(i)
             if pygame.sprite.spritecollideany(i, evil):
                 for j in pygame.sprite.spritecollide(i, evil, False):
+                    collisionSound.play()
                     i.run(j, 0.5, reverse=True, ma=True)
             evil.add(i)
         evil.update()
         for i in player:
             if pygame.sprite.spritecollideany(i, evil):
                 for j in pygame.sprite.spritecollide(i, evil, False):
+                    collisionSound.play()
                     if j in i.attack:
                         if j.get_name() == i.get_name():
                             delet = random.choice([i, j])
@@ -533,12 +587,15 @@ while running:
                     else:
                         should_write[0][1] -= i.velocity * 2
                         player.remove(i)
+        screen2.fill((0, 255, 255))
+        screen.blit(screen2, playerList[index].rect[:2])
         if len(player) == 0 or len(evil) == 0:
             index = 0
             was += 1 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! delet
             player, evil = pygame.sprite.Group(), pygame.sprite.Group()
-            if was == 1:
+            if was == 12:
                 if should_write[0][1] > 0:
+                    points += should_write[0][1]
                     level += 1
                 state = 2
             else:
@@ -549,12 +606,18 @@ while running:
                     i.restart(player)
                     evil.add(i)
                 evilShuffle()
+        exit.draw(screen)
     if state == 3:
         menu.draw(screen)
-        write(should_write[0][0], 'points: ' + str(should_write[0][1]), size=50)
+        write((0, 0), 'points: ' + str(points), size=50)
         write((0, 100), 'level: ' + str(level), size=50)
     elif state == 4:
         skins.draw(screen)
+        for i in skins:
+            if i.get_name() != 'Exit':
+                screen.blit(i.text, (i.rect[0], i.rect[1] + i.rect[3]))
+        write((10, sizeY - 100), answer, 50)
+        write((sizeX // 2, 0), str(points), size=50)
     else:
         player.draw(screen)
         evil.draw(screen)
@@ -563,7 +626,8 @@ while running:
                 should_write[i][0], should_write[i][1])
         if choose_diapason:
             diapason.draw(screen)
-        if state == 2 and was != 0:
+        if state == 2:
+            pygame.mixer.music.fadeout(2000)
             showResult()
+        exit.draw(screen)
     pygame.display.flip()
-
