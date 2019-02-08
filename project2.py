@@ -1,4 +1,5 @@
 import pygame, os, random, ctypes
+os.environ['SDL_VIDEO_CENTERED'] = '1'
 
 
 def write(position, text, size=20):
@@ -334,12 +335,25 @@ class Exit(pygame.sprite.Sprite):
         screen.blit(self.image, (0, 0))
 
 
-class Particle(pygame.sprite.Sprite):
-    # сгенерируем частицы разного размера
-    #fire = [load_image("star.png")]
-    #for scale in (5, 10, 20):
-    #    fire.append(pygame.transform.scale(fire[0], (scale, scale)))
+class Rules(pygame.sprite.Sprite):
+    def __init__(self, group):
+        super().__init__(group)
+        self.image = load_image('rules.png', -1)
+        self.rect = self.image.get_rect()
+        self.rect[0] = sizeX - self.rect[2]
 
+    def get_click(self, pos):
+        if self.rect[0] <= pos[0] <= self.rect[0] + self.rect[2] \
+                and self.rect[1] <= pos[1] <= self.rect[1] + self.rect[3]:
+            return 5
+        return state
+
+    def get_name(self):
+        return 'Rules'
+
+
+
+class Particle(pygame.sprite.Sprite):
     def __init__(self, pos, dx, dy, name):
         super().__init__(particles_sprites)
         self.image = load_image(name, -1)
@@ -448,6 +462,7 @@ particles_sprites = pygame.sprite.Group()
 SkinMenu(menu)
 ButtonStart(menu)
 Sound(menu)
+Rules(menu)
 file = open('data/result.txt', mode='r')
 points, level = map(int, file.read().split())
 file.close()
@@ -471,10 +486,34 @@ was = 0
 state = 3
 ok, full, choose_diapason = False, False, False
 clock = pygame.time.Clock()
-set_skins(12)
+set_skins(17)
 exit = Exit(skins)
+background = pygame.transform.scale(load_image('newbackground.jpg'), (sizeX, sizeY))
+rules = ['Игра "Семь"',
+'В данной игре в вашем распоряжении 7 фигур: 1 король, 2 аристократа, 4 простолюдина',
+'Цель игры - уничтожить все фигуры противника с минимальными потерями',
+'При начале игры нужно указать порядок аттаки и диапазон отступления для каждой фигуры',
+'Король нападает на вражеских короля и аристократов',
+'Аристократ - на вражеских аристократов и простолюдинов',
+'Простолюдин - на вражеских простолюдинов и короля',
+'Игрок управляет одной из 7 фигур, остальные фигуры движутся согласно указанному порядку аттаки',
+'Между фигурами можно переключаться при помощи клавиши пробела',
+'В каждом раунде по 12 игр в которых выбранный порядок аттаки остается неизменным',
+'По истечении 12 игр, подводится итог в баллах',
+'За уничтожение вражеского короля прибавляется 400 баллов, за потерю своего - вычитается',
+'За уничтожение вражеского аристократа прибавляется 200 баллов, за потерю своего - вычитается',
+'За уничтожение вражеского короля прибавляется 200 баллов, за потерю своего - вычитается',
+'Если за раунд игрок ушел в плюс, то он переходит на следующий уровень,',
+'баллы прибавляются к общему счету',
+'Король движется в 2 раза быстрее аристократа и в 4 раза быстрее простолюдина',
+'Если фигурой управляет игрок, то ее скорость увеличивается']
+
+
+
+
 while running:
-    screen.fill((0, 0, 0))
+    screen.fill((100, 100, 100))
+    screen.blit(background, (0, 0))
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -510,7 +549,7 @@ while running:
                             if full:
                                 choose_diapason = True
                             if ok:
-                                should_write.append([i.rect[:2],  str(ok)])
+                                should_write.append([(i.rect[0] - 10, i.rect[1]),  str(ok)])
             if state == 2:
                 clock.tick()
                 pygame.mixer.music.play(-1)
@@ -525,6 +564,7 @@ while running:
                 was = 0
                 should_write[0][1] = 0
             if state == 3:
+                should_write = [should_write[0]]
                 answer = ''
                 for i in menu:
                     if i.get_name() == 'Sound':
@@ -626,14 +666,14 @@ while running:
                         create_particles(i.rect[:2], 'killStar.png')
                         should_write[0][1] -= i.velocity * 2
                         player.remove(i)
-        screen2.fill((0, 255, 255))
+        screen2.fill((100, 100, 100))
         screen.blit(screen2, playerList[index].rect[:2])
         if len(player) == 0 or len(evil) == 0:
             index = 0
             was += 1 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! delet
             player, evil = pygame.sprite.Group(), pygame.sprite.Group()
             if was == 12:
-                points = min(points + should_write[0][1], 0)
+                points = max(points + should_write[0][1], 0)
                 if should_write[0][1] > 0:
                     level += 1
                 state = 2
@@ -657,6 +697,10 @@ while running:
                 screen.blit(i.text, (i.rect[0], i.rect[1] + i.rect[3]))
         write((10, sizeY - 100), answer, 50)
         write((sizeX // 2, 0), str(points), size=50)
+    elif state == 5:
+        exit.draw(screen)
+        for i in range(len(rules)):
+            write([110, 10 + i * 30], rules[i])
     else:
         player.draw(screen)
         evil.draw(screen)
