@@ -1,0 +1,17 @@
+11 True
+14 False
+5 True
+16 False
+9 True
+2 True
+15 False
+3 True
+1 True
+12 False
+6 True
+0 True
+4 True
+13 False
+10 True
+8 True
+7 True
