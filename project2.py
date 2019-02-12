@@ -3,12 +3,14 @@ os.environ['SDL_VIDEO_CENTERED'] = '1'
 
 
 def write(position, text, size=20):
+    # Функция отвечает за вывод текстовой информации на экран
     font = pygame.font.SysFont('Times New Roman', size)
     text = font.render(str(text), 1, (255, 255, 255))
     screen.blit(text, position)
 
 
 def load_image(name, colorkey=None, local_path=''):
+    # Функция отвечает за загрузку изображений
     fullname = os.path.join('data', local_path, name)
     try:
         image = pygame.image.load(fullname)
@@ -25,6 +27,7 @@ def load_image(name, colorkey=None, local_path=''):
 
 
 class Figure(pygame.sprite.Sprite):
+    # Общий класс для всех фигур
     def __init__(self, group, pos, image, velocity, mass, player, evil):
         super().__init__(group)
         self.indexAttack = 0
@@ -38,24 +41,28 @@ class Figure(pygame.sprite.Sprite):
         self.new_coords = list(pos)
         self.attack = []
         self.radius = -1
-        # self.died = False
 
     def restart(self, opposite):
+        # Функция перезагруски. Вызывается при завершении одного раунда, возвращает фигуру на исходную позицию
         self.rect[:2] = self.startPos
         self.new_coords = list(self.startPos)
         self.indexAttack = 0
         self.opposition = opposite
 
     def set_image(self, image, localpath):
+        # Изменение изображения фигуры. Применяется для фигур противника
         self.image = load_image(image, -1, localpath)
 
     def get_click(self, pos):
+        # Проверка того, что на фигуру нажали
         if self.rect[0] - 10 <= pos[0] <= self.rect[2] + self.rect[0] + 10 and (
                 self.rect[1] - 10 <= pos[1] <= self.rect[3] + self.rect[1] + 10):
             return True
         return False
 
     def run(self, obj, tick, reverse=False, ma=False):
+        # Функция автоматического движения фигуры
+        # Фигура движется в направлении 
         if obj.new_coords[1] - self.new_coords[1] == 0:
             b = 0
             a = self.velocity * tick if self.new_coords[0] < obj.new_coords[0] else -self.velocity * tick
@@ -76,8 +83,6 @@ class Figure(pygame.sprite.Sprite):
 
         self.new_coords = [min(max(0, self.new_coords[0] + a), sizeX - self.rect[2]), min(
             max(self.new_coords[1] + b, 0), sizeY - self.rect[3])]
-
-
 
     def update(self, *args):
         self.rect[:2] = self.new_coords
@@ -473,7 +478,37 @@ def skin_screen(points, localpath):
 
 
 def rules_screen():
-    pass
+    rules = ['Игра "Семь"',
+             'В данной игре в вашем распоряжении 7 фигур: 1 король, 2 аристократа, 4 простолюдина',
+             'Цель игры - уничтожить все фигуры противника с минимальными потерями',
+             'При начале игры нужно указать порядок аттаки и диапазон отступления для каждой фигуры',
+             'Король нападает на вражеских короля и аристократов',
+             'Аристократ - на вражеских аристократов и простолюдинов',
+             'Простолюдин - на вражеских простолюдинов и короля',
+             'Игрок управляет одной из 7 фигур, остальные фигуры движутся согласно указанному порядку аттаки',
+             'Между фигурами можно переключаться при помощи клавиши пробела',
+             'В каждом раунде по 12 игр в которых выбранный порядок аттаки остается неизменным',
+             'По истечении 12 игр, подводится итог в баллах',
+             'За уничтожение вражеского короля прибавляется 800 баллов, за потерю своего - вычитается',
+             'За уничтожение вражеского аристократа прибавляется 400 баллов, за потерю своего - вычитается',
+             'За уничтожение вражеского солдата прибавляется 200 баллов, за потерю своего - вычитается',
+             'Если за раунд игрок ушел в плюс, то он переходит на следующий уровень,',
+             'баллы прибавляются к общему счету',
+             'Король движется в 2 раза быстрее аристократа и в 4 раза быстрее простолюдина',
+             'Если фигурой управляет игрок, то ее скорость увеличивается']
+    while True:
+        screen.blit(background, (0, 0))
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                create_particles(event.pos, 'star.png')
+                return
+        for i in range(len(rules)):
+            write((20, i * 40), rules[i], size=25)
+        particles_sprites.update()
+        particles_sprites.draw(screen)
+        pygame.display.flip()
 
 
 def setting_screen(player, evil, playerList, screen2, should_write):
@@ -717,24 +752,6 @@ clock = pygame.time.Clock()
 set_skins(17)
 exit = Exit(skins)
 background = pygame.transform.scale(load_image('newbackground.jpg'), (sizeX, sizeY))
-rules = ['Игра "Семь"',
-'В данной игре в вашем распоряжении 7 фигур: 1 король, 2 аристократа, 4 простолюдина',
-'Цель игры - уничтожить все фигуры противника с минимальными потерями',
-'При начале игры нужно указать порядок аттаки и диапазон отступления для каждой фигуры',
-'Король нападает на вражеских короля и аристократов',
-'Аристократ - на вражеских аристократов и простолюдинов',
-'Простолюдин - на вражеских простолюдинов и короля',
-'Игрок управляет одной из 7 фигур, остальные фигуры движутся согласно указанному порядку аттаки',
-'Между фигурами можно переключаться при помощи клавиши пробела',
-'В каждом раунде по 12 игр в которых выбранный порядок аттаки остается неизменным',
-'По истечении 12 игр, подводится итог в баллах',
-'За уничтожение вражеского короля прибавляется 800 баллов, за потерю своего - вычитается',
-'За уничтожение вражеского аристократа прибавляется 400 баллов, за потерю своего - вычитается',
-'За уничтожение вражеского солдата прибавляется 200 баллов, за потерю своего - вычитается',
-'Если за раунд игрок ушел в плюс, то он переходит на следующий уровень,',
-'баллы прибавляются к общему счету',
-'Король движется в 2 раза быстрее аристократа и в 4 раза быстрее простолюдина',
-'Если фигурой управляет игрок, то ее скорость увеличивается']
 while running:
     screen.fill((100, 100, 100))
     screen.blit(background, (0, 0))
@@ -757,7 +774,7 @@ while running:
                     if i.get_name() == 'SkinMenu':
                         points, localpath = skin_screen(points, localpath)
                     elif i.get_name() == 'Rules':
-                        pass
+                        rules_screen()
                     elif i.get_name() == 'ButtonStart':
                         points, level = game_screen(points, level)
     particles_sprites.update()
