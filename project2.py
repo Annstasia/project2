@@ -1,4 +1,7 @@
 import pygame, os, random, ctypes, sys
+from PIL import Image
+
+# Выравнивание экрана поцентру
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 
 
@@ -26,26 +29,65 @@ def load_image(name, colorkey=None, local_path=''):
         raise SystemExit(message)
 
 
+def create_images(path, name):
+    # Создание изображений
+    # В папках 4 - 17 изначально хранятся только изображения макетов фигур
+    # Т.к. у программы нет установщика, то изображения создаются при первом открытии игры
+    im = Image.open("data/" + str(path) + "/parent.jpg")
+    pixels = im.load()
+    x, y = im.size
+    # У каждой фигуры свой цвет
+    if name == 'aristocrat.png':
+        color = (185, 108, 114)
+    elif name == 'aristocrate.png':
+        color = (127, 185, 179)
+    elif name == 'king.png':
+        color = (182, 181, 107)
+    elif name == 'kinge.png':
+        color = (129, 69, 105)
+    elif name == 'soldier.png':
+        color = (162, 130, 79)
+    else:
+        color = (83, 174, 112)
+    for i in range(x):
+        for j in range(y):
+            r, g, b = pixels[i, j]
+            # В изображениях - родителях белый цвет не задается как (255, 255, 255), присутствуют различные оттенки
+            # Для того, чтобы убрать фон, оттенки надо привести к единому цвету (я привела к черному цвету)
+            if r < 200 or g < 200 or b < 200:
+                # Если какой-нибудь из показателей rgb пикселя меньше 200, то пиксль принадлежит именно фигуре, а не фону
+                r, g, b = color
+                # Что может быть лучше градиента?
+                pixels[i, j] = int(r + 3 * ((x / 2 - i) ** 2 + (y / 2 - j) ** 2) ** 0.5), \
+                               int(g + 3 * ((x / 2 - i) ** 2 + (y / 2 - j) ** 2) ** 0.5), \
+                               int(b + 3 * ((x / 2 - i) ** 2 + (y / 2 - j) ** 2) ** 0.5)
+            else:
+                pixels[i, j] = 0, 0, 0
+    im.save("data/" + str(path) + '/' + name)
+
+
 class Figure(pygame.sprite.Sprite):
     # Общий класс для всех фигур
     def __init__(self, group, pos, image, velocity, mass, player, evil):
         super().__init__(group)
         self.indexAttack = 0
-        self.mass = mass
-        self.velocity = velocity
-        self.opposition = player if group is evil else evil
+        self.mass = mass  # Масса влияет на величину отскока фигуры при столкновении
+        self.velocity = velocity  # Скорость движения фигуры
+        self.opposition = player if group is evil else evil  # Команда противника
         self.image = image
         self.rect = self.image.get_rect()
-        self.startPos = pos
+        self.STARTPOS = pos  # В переменной сохраняется изначальное расположение фигуры
         self.rect[:2] = pos
-        self.new_coords = list(pos)
-        self.attack = []
-        self.radius = -1
+        self.new_coords = list(pos)  # В переменной хранятся не округленные
+        self.attack = []  # Порядок аттаки
+        self.radius = -1  # Диапазон отступления
 
     def restart(self, opposite):
-        # Функция перезагруски. Вызывается при завершении одного раунда, возвращает фигуру на исходную позицию
-        self.rect[:2] = self.startPos
-        self.new_coords = list(self.startPos)
+        # Функция перезагруски. Вызывается при завершении промежуточных раундов, т.е. когда
+        # у фигур игрока не меняется порядок атаки. Функция возвращает фигуру на исходную позицию
+
+        self.rect[:2] = self.STARTPOS  # Устанавливаются первоначальные координаты
+        self.new_coords = list(self.STARTPOS)
         self.indexAttack = 0
         self.opposition = opposite
 
@@ -62,27 +104,37 @@ class Figure(pygame.sprite.Sprite):
 
     def run(self, obj, tick, reverse=False, ma=False):
         # Функция автоматического движения фигуры
-        # Фигура движется в направлении 
+        # Фигура движется по кратчайшему расстоянию к своей цели
         if obj.new_coords[1] - self.new_coords[1] == 0:
+            # Eсли координаты фигур по Oy равны, то движение происходит только по Ox
             b = 0
             a = self.velocity * tick if self.new_coords[0] < obj.new_coords[0] else -self.velocity * tick
-        elif -1 <= self.new_coords[0] - obj.new_coords[0] <= 1:
+        elif self.new_coords[0] - obj.new_coords[0] == 0:
+            # Eсли координаты фигур по Ox равны, то движение происзодит только по Oy
             b = self.velocity * tick if self.new_coords[1] < obj.new_coords[1] else -self.velocity * tick
             a = 0
         else:
-            b = ((self.velocity * tick)**2 / (
-                    1 + ((obj.new_coords[0] - self.new_coords[0]) / (obj.new_coords[1] - self.new_coords[1])) ** 2))**0.5
+            # В остальных случаях перемещение по Oy и Ox высчитываетс из теоремы Пифагора и
+            #  подобия треугольников расстояния и перемещения
+            b = ((self.velocity * tick) ** 2 / (
+                    1 + ((obj.new_coords[0] - self.new_coords[0]) / (
+                    obj.new_coords[1] - self.new_coords[1])) ** 2)) ** 0.5
             if obj.new_coords[1] < self.new_coords[1]:
                 b = -b
             a = b * (obj.new_coords[0] - self.new_coords[0]) / (obj.new_coords[1] - self.new_coords[1])
         if reverse:
+            # Если фигура отступает, то вектор ее движения (а соответственно и проекции на оси) будет
+            #  противонаправлен высчитанному
             b, a = -b, -a
         if ma:
+            # ma отвечает за отскок, обращается в True при столконовении с союзником
+            # чем больше масса фигуры, тем слабее отскок
             a /= self.mass
             b /= self.mass
-
         self.new_coords = [min(max(0, self.new_coords[0] + a), sizeX - self.rect[2]), min(
             max(self.new_coords[1] + b, 0), sizeY - self.rect[3])]
+        # При движении у стены скорость фигуры уменьшается
+        # Фигуру можно "зажать" в угол
 
     def update(self, *args):
         self.rect[:2] = self.new_coords
@@ -95,10 +147,12 @@ class King(Figure):
     def get_name(self):
         return 'King'
 
-
     def ask_setting(self):
+        # Подсказка игроку
+        # Пока не заполнится список атаки,  требуется выбирать вражеские фигуры, после - диапазон
         if len(self.attack) < 3:
-            return 'Определите порядок аттаки'
+            return 'Определите порядок аттаки. Выберите аристократов, короля. ' \
+                   'Осталось выбрать фигур: {}'.format(3 - len(self.attack))
         if self.radius == -1:
             return 'Выберите диапазон, начиная с которого король будет отступать'
         return 'ОК'
@@ -115,15 +169,20 @@ class King(Figure):
         try:
             need_run = {}
             for i in self.opposition:
+                # Проверка попадания фигуры, от которой надо бежать в диапазон отступления
                 if i.get_name() == 'Soldier' and (
                         i.rect[0] - self.rect[0]) ** 2 + (i.rect[1] - self.rect[1]) ** 2 <= self.radius ** 2:
                     need_run[(i.rect[0] - self.rect[0]) ** 2 + (i.rect[1] - self.rect[1]) ** 2] = i
             if bool(need_run):
+                # Фигура отступает от ближайшей опасной фигуры, попавшей в лиапазон
                 self.run(need_run[min(need_run)], tick, reverse=True)
             else:
+                # Если ни от кого бежать не нужно
                 while len(self.attack) > self.indexAttack and self.attack[self.indexAttack] not in self.opposition:
+                    # Если фигуру, являющуяся уже убили, то целью становится следущая согласно порядку атаки фигура
                     self.indexAttack += 1
                 if len(self.attack) > self.indexAttack:
+                    # Атака цели
                     self.run(self.attack[self.indexAttack], tick)
         except Exception as e:
             print(e)
@@ -131,12 +190,14 @@ class King(Figure):
 
 class Aristocrat(Figure):
     def __init__(self, group, pos, player, evil):
+        # Аналогично классу короля
         super().__init__(group, pos, load_image('aristocrat.png', -1, localpath), 200, 5, player, evil)
-        self.resultant = (self.rect[0], self.rect[1])
+        # self.resultant = (self.rect[0], self.rect[1])
 
     def ask_setting(self):
         if len(self.attack) < 6:
-            return 'Определите порядок аттаки'
+            return 'Определите порядок аттаки. Выберите солдатов, аристократов. ' \
+                   'Осталось выбрать фигур: {}'.format(6 - len(self.attack))
         if self.radius == -1:
             return 'Выберите диапазон, начиная с которого аристократ будет отступать'
         return 'ОК'
@@ -163,15 +224,16 @@ class Aristocrat(Figure):
                 self.run(need_run[min(need_run)], tick, reverse=True)
             else:
                 while len(self.attack) > self.indexAttack and self.attack[self.indexAttack] not in self.opposition:
-                    self. indexAttack += 1
+                    self.indexAttack += 1
                 if len(self.attack) > self.indexAttack:
                     self.run(self.attack[self.indexAttack], tick)
-        except Exception as e :
+        except Exception as e:
             print(e)
 
 
 class Soldier(Figure):
     def __init__(self, group, pos, player, evil):
+        # Аналогично классу короля
         super().__init__(group, pos, load_image('soldier.png', -1, localpath), 100, 2, player, evil)
 
     def get_name(self):
@@ -179,7 +241,8 @@ class Soldier(Figure):
 
     def ask_setting(self):
         if len(self.attack) < 5:
-            return 'Определите порядок аттаки'
+            return 'Определите порядок аттаки. Выберите короля, солдатов. ' \
+                   'Осталось выбрать фигур: {}'.format(5 - len(self.attack))
         if self.radius == -1:
             return 'Выберите диапазон, начиная с которого простолюдин будет отступать'
         return 'ОК'
@@ -191,7 +254,6 @@ class Soldier(Figure):
                 return len(self.attack), True
             return len(self.attack), False
         return False, False
-
 
     def move(self, tick):
         try:
@@ -210,14 +272,15 @@ class Soldier(Figure):
         except Exception as e:
             print(e)
 
+
 class Diapason(pygame.sprite.Sprite):
     def __init__(self, group, pos, image, radius):
         super().__init__(group)
+        # Кнопки диапазона
         self.image = image
         self.rect = self.image.get_rect()
         self.rect[:2] = pos
-        self.radius = radius
-        # self.velocity = 10
+        self.radius = radius  # Значение диапазона
 
     def get_click(self, pos):
         if self.rect[0] <= pos[0] <= self.rect[2] + self.rect[0] and (
@@ -228,12 +291,13 @@ class Diapason(pygame.sprite.Sprite):
 
 class SkinMenu(pygame.sprite.Sprite):
     def __init__(self, group):
+        # Кнопка смены экрана (вешалка)
         super().__init__(group)
         self.image = load_image('skinMenu.png')
         self.rect = self.image.get_rect()
         self.rect[0] = sizeX - self.rect[2]
         self.rect[1] = sizeY - self.rect[3]
-        self.level = 0
+        # self.level = 0
 
     def get_click(self, pos):
         if self.rect[0] <= pos[0] <= self.rect[0] + self.rect[2] \
@@ -246,11 +310,13 @@ class SkinMenu(pygame.sprite.Sprite):
 
 class ButtonStart(pygame.sprite.Sprite):
     def __init__(self, group):
+        # Кнопка смены экрана (начало игры)
         super().__init__(group)
         self.image = load_image('buttonStart.png', -1)
         self.rect = self.image.get_rect()
         self.rect[0] = (sizeX - self.rect[2]) // 2
         self.rect[1] = (sizeY - self.rect[3]) // 2
+
     def get_click(self, pos):
         if self.rect[0] <= pos[0] <= self.rect[0] + self.rect[2] \
                 and self.rect[1] <= pos[1] <= self.rect[1] + self.rect[3]:
@@ -262,6 +328,7 @@ class ButtonStart(pygame.sprite.Sprite):
 
 class Sound(pygame.sprite.Sprite):
     def __init__(self, group):
+        # Кнопка изменения громкости
         super().__init__(group)
         self.sounds = [load_image('sound100.png', -1), load_image('sound75.png', -1),
                        load_image('sound50.png', -1), load_image('sound25.png', -1),
@@ -286,8 +353,8 @@ class Sound(pygame.sprite.Sprite):
 class Skin(pygame.sprite.Sprite):
     def __init__(self, group, pos, localpath, points):
         super().__init__(group)
-        self.localpath = localpath
-        self.points = points
+        self.localpath = localpath  #Название папки (все скины хранятся в отдельных папках)
+        self.points = points  # Необходимые для покупки очки
         self.image = load_image('king.png', -1, localpath)
         self.rect = self.image.get_rect()
         self.rect[:2] = pos
@@ -301,8 +368,10 @@ class Skin(pygame.sprite.Sprite):
         if self.rect[0] <= pos[0] <= self.rect[0] + self.rect[2] \
                 and self.rect[1] <= pos[1] <= self.rect[1] + self.rect[3]:
             if self.bought:
+                # Покупки запоминаются. Если какой-то скин был куплен, то bought = True
                 return self.localpath, 'OK', points
             if points >= self.points:
+                # Процесс покупки
                 self.bought = True
                 return self.localpath, 'OK', points - self.points
             return localpath, 'НЕ ХВАТАЕТ ОЧКОВ', points
@@ -314,9 +383,11 @@ class Skin(pygame.sprite.Sprite):
 
 class Exit(pygame.sprite.Sprite):
     def __init__(self, group):
+        # Кнопка возвращения в главное меню
         super().__init__(group)
         self.image = load_image('exit.png', None)
         self.rect = self.image.get_rect()
+
     def get_click(self, pos):
         if self.rect[0] <= pos[0] <= self.rect[0] + self.rect[2] \
                 and self.rect[1] <= pos[1] <= self.rect[1] + self.rect[3]:
@@ -331,6 +402,7 @@ class Exit(pygame.sprite.Sprite):
 
 class Rules(pygame.sprite.Sprite):
     def __init__(self, group):
+        # Кнопка просмотра правил
         super().__init__(group)
         self.image = load_image('rules.png', -1)
         self.rect = self.image.get_rect()
@@ -347,6 +419,7 @@ class Rules(pygame.sprite.Sprite):
 
 class Particle(pygame.sprite.Sprite):
     def __init__(self, pos, dx, dy, name):
+        # Класс частиц, возникающих при нажатии или уничтожении фигуры
         super().__init__(particles_sprites)
         self.image = load_image(name, -1)
         self.rect = self.image.get_rect()
@@ -358,12 +431,12 @@ class Particle(pygame.sprite.Sprite):
         self.rect.x += self.velocity[0]
         self.rect.y += self.velocity[1]
         # убиваем, если частица ушла за экран
-        # print(self.velocity)
         if (self.startX - self.rect.x) ** 2 + (self.startY - self.rect.y) ** 2 > 900:
             self.kill()
 
 
 def setting(player, evil):
+    # Расстановка фигур по первоначальным позициям
     w, h = load_image('king.png', -1, localpath).get_size()
     King(evil, (w, int(sizeY / 2 - h / 2)), player, evil).set_image('kinge.png', localpath)
     Aristocrat(evil, (3 * w, int(sizeY / 3 - h / 2)), player, evil).set_image('aristocrate.png', localpath)
@@ -375,9 +448,9 @@ def setting(player, evil):
     king, aristocrat1, aristocrat2, soldier1, soldier2, soldier3, soldier4 = \
         King(player, (sizeX - 2 * w, int(sizeY / 2 - h / 2)), player, evil), \
         Aristocrat(player, (sizeX - 4 * w, int(sizeY / 3 - h / 2)), player, evil), \
-        Aristocrat(player, (sizeX - 4 * w, int(2 * sizeY / 3 - h / 2)), player, evil),\
+        Aristocrat(player, (sizeX - 4 * w, int(2 * sizeY / 3 - h / 2)), player, evil), \
         Soldier(player, (sizeX - 6 * w, int(sizeY / 5 - h / 2)), player, evil), \
-        Soldier(player, (sizeX - 6 * w, int(2 * sizeY / 5 - h / 2)), player, evil),\
+        Soldier(player, (sizeX - 6 * w, int(2 * sizeY / 5 - h / 2)), player, evil), \
         Soldier(player, (sizeX - 6 * w, int(3 * sizeY / 5 - h / 2)), player, evil), \
         Soldier(player, (sizeX - 6 * w, int(4 * sizeY / 5 - h / 2)), player, evil)
     for i in evil:
@@ -695,11 +768,13 @@ def game_screen(points, level):
 
 def finish_screen():
     while True:
+        screen.blit(background, (0, 0))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 create_particles(event.pos, 'star.png')
+                pygame.mixer.music.play(-1)
                 return exit.get_click(event.pos)
         pygame.mixer.music.fadeout(2000)
         showResult()
@@ -749,11 +824,19 @@ was = 0
 state = 3
 ok, full, choose_diapason = False, False, False
 clock = pygame.time.Clock()
+if not os.path.exists('data/4/king.png'):
+    for i in range(4, 17):
+        create_images(i, 'aristocrat.png')
+        create_images(i, 'aristocrate.png')
+        create_images(i, 'king.png')
+        create_images(i, 'kinge.png')
+        create_images(i, 'soldier.png')
+        create_images(i, 'soldiere.png')
+
 set_skins(17)
 exit = Exit(skins)
 background = pygame.transform.scale(load_image('newbackground.jpg'), (sizeX, sizeY))
 while running:
-    screen.fill((100, 100, 100))
     screen.blit(background, (0, 0))
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
