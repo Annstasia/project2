@@ -1,5 +1,10 @@
-import pygame, os, random, ctypes, sys
+import pygame
+import os
+import random
+import ctypes
+import sys
 from PIL import Image
+
 
 # Выравнивание экрана поцентру
 os.environ['SDL_VIDEO_CENTERED'] = '1'
@@ -55,7 +60,8 @@ def create_images(path, name):
             # В изображениях - родителях белый цвет не задается как (255, 255, 255), присутствуют различные оттенки
             # Для того, чтобы убрать фон, оттенки надо привести к единому цвету (я привела к черному цвету)
             if r < 200 or g < 200 or b < 200:
-                # Если какой-нибудь из показателей rgb пикселя меньше 200, то пиксль принадлежит именно фигуре, а не фону
+                # Если какой-нибудь из показателей rgb пикселя меньше 200?
+                # то пиксль принадлежит именно фигуре, а не фону
                 r, g, b = color
                 # Что может быть лучше градиента?
                 pixels[i, j] = int(r + 3 * ((x / 2 - i) ** 2 + (y / 2 - j) ** 2) ** 0.5), \
@@ -353,7 +359,7 @@ class Sound(pygame.sprite.Sprite):
 class Skin(pygame.sprite.Sprite):
     def __init__(self, group, pos, localpath, points):
         super().__init__(group)
-        self.localpath = localpath  #Название папки (все скины хранятся в отдельных папках)
+        self.localpath = localpath  # Название папки (все скины хранятся в отдельных папках)
         self.points = points  # Необходимые для покупки очки
         self.image = load_image('king.png', -1, localpath)
         self.rect = self.image.get_rect()
@@ -464,44 +470,28 @@ def setting(player, evil):
 
 
 def evilShuffle(evil):
+    # Рандомный порядок аттаки для команды компьютера
     for i in evil:
         random.shuffle(i.attack)
         i.radius = random.choice([40, 80, 120, 160, 200])
 
 
-def showResult():
-    if should_write[0][1] < 0:
-        loseSound.play()
-        pygame.draw.rect(screen, (255, 0, 0), (3 * sizeX // 8, 3 * sizeY // 8, sizeX // 4, sizeY // 4))
-    elif should_write[0][1] == 0:
-        loseSound.play()
-        pygame.draw.rect(screen, (0, 0, 255), (3 * sizeX // 8, 3 * sizeY // 8, sizeX // 4, sizeY // 4))
-    else:
-        winSound.play()
-        pygame.draw.rect(screen, (0, 255, 0), (3 * sizeX // 8, 3 * sizeY // 8, sizeX // 4, sizeY // 4))
-    font = pygame.font.SysFont('Times New Roman', 30)
-    text = font.render('points: ' + str(should_write[0][1]), 1, (255, 255, 255))
-    screen.blit(text, (3 * sizeX // 8 + (sizeX // 4 - text.get_rect()[2]) // 2,
-                       3 * sizeY // 8 + (sizeY // 8 - text.get_rect()[3]) // 2))
-    text = font.render('level: ' + str(level), 1, (255, 255, 255))
-    screen.blit(text, (3 * sizeX // 8 + (sizeX // 4 - text.get_rect()[2]) // 2,
-                       4 * sizeY // 8 + (sizeY // 8 - text.get_rect()[3]) // 2))
-
-
 def set_skins(number):
-    startX, startY = 100, 100
+    # Загрузка, расстановка скинов в магазине
+    start_x, start_y = 100, 100
     for i in range(number):
-        skin = Skin(skins, (startX, startY), str(i), i * 5000)
-        if startX + 100 + 2 * skin.w > sizeX:
-            startX = 100
-            startY += 100 + skin.h
+        skin = Skin(skins, (start_x, start_y), str(i), i * 5000)
+        if start_x + 100 + 2 * skin.w > sizeX:
+            start_x = 100
+            start_y += 100 + skin.h
         else:
-            startX += skin.w + 100
+            start_x += skin.w + 100
         if bought.get(str(i), 'False') == 'True':
             skin.bought = True
 
 
 def create_particles(position, name):
+    # Создание частиц, руагирующих на нажатие или уничтожение фигуры
     particle_count = 20
     numbers = range(-5, 6)
     for _ in range(particle_count):
@@ -512,6 +502,7 @@ def create_particles(position, name):
 
 
 def terminate():
+    # Выход из игры
     file = open('data/result.txt', mode='w')
     file.write(str(points) + ' ' + str(level))
     file.close()
@@ -525,6 +516,7 @@ def terminate():
 
 
 def skin_screen(points, localpath):
+    # Окно магазина
     answer = ''
     while True:
         screen.blit(background, (0, 0))
@@ -551,6 +543,7 @@ def skin_screen(points, localpath):
 
 
 def rules_screen():
+    # Окно правил
     rules = ['Игра "Семь"',
              'В данной игре в вашем распоряжении 7 фигур: 1 король, 2 аристократа, 4 простолюдина',
              'Цель игры - уничтожить все фигуры противника с минимальными потерями',
@@ -585,6 +578,7 @@ def rules_screen():
 
 
 def setting_screen(player, evil, playerList, screen2, should_write):
+    # Начало 12 раундов (выбор порядка атаки, диапазона отступления)
     need_setting = playerList.copy()
     clock.tick()
     ok, full, choose_diapason = False, False, False
@@ -610,8 +604,10 @@ def setting_screen(player, evil, playerList, screen2, should_write):
                         if i.get_click(event.pos):
                             ok, full = need_setting[0].set_aims(i)
                             if full:
+
                                 choose_diapason = True
                             if ok:
+                                # Добавление в список номеров выьранных целей для фигуры
                                 should_write.append([(i.rect[0] - 10, i.rect[1]), str(ok)])
                 if exit.get_click(event.pos):
                     del should_write[1:]
@@ -620,12 +616,14 @@ def setting_screen(player, evil, playerList, screen2, should_write):
         particles_sprites.update()
         particles_sprites.draw(screen)
         write((50, int(4 * sizeY / 5 + playerList[0].image.get_size()[1])), need_setting[0].ask_setting())
-        screen2.fill((0, 255, 0))
+        screen2.fill((0, 255, 0))  # Выделяется фигуры, для которой выбирается порядок атаки и диапазон отступления
         screen.blit(screen2, (need_setting[0].rect[:2]))
         exit.draw(screen)
         player.draw(screen)
         evil.draw(screen)
         for i in range(len(should_write)):
+            # Около каждой выбранной цели выводится ее номер в порядке атаки
+            # Первый элемент в списке - количество очков
             write(should_write[i][0], should_write[i][1], size=50) if i == 0 else write(
                 should_write[i][0], should_write[i][1])
         if choose_diapason:
@@ -634,14 +632,16 @@ def setting_screen(player, evil, playerList, screen2, should_write):
 
 
 def game_screen(points, level):
+    # Игровой экран
     player = pygame.sprite.Group()
     evil = pygame.sprite.Group()
     playerList = setting(player, evil)
     evilList = [i for i in evil]
-    evilShuffle(evil)
+    evilShuffle(evil)  # Установка рандомного порядка атаки для компьютера
     index = 0
     screen2 = pygame.Surface(playerList[0].image.get_size())
     if setting_screen(player, evil, playerList, screen2, should_write):
+        # Условие выполняется при нажатии на кнопку возвращения на главный экран при выборе порядка атаки
         return points, level
     was = 0
     while True:
@@ -650,6 +650,7 @@ def game_screen(points, level):
             if event.type == pygame.QUIT:
                 terminate()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                # Перемещение между ведомыми фигурами
                 index = (index + 1) % len(playerList)
                 while playerList[index] not in player:
                     index = (index + 1) % len(playerList)
@@ -663,14 +664,18 @@ def game_screen(points, level):
         keys = pygame.key.get_pressed()
         while playerList[index] not in player:
             index = (index + 1) % len(playerList)
+        # Перемещение ведомой фигуры. Если фигурой управляет игрок, то скорость ее движения
+        # по каждой из координатных осей возрастает в 2 раза.
+        # Таким образом макимальная скорость - при движении по диагонали
         if keys[pygame.K_DOWN]:
-            playerList[index].new_coords[1] += tick * playerList[index].velocity
+            playerList[index].new_coords[1] += tick * playerList[index].velocity * 2
         if keys[pygame.K_UP]:
             playerList[index].new_coords[1] -= tick * playerList[index].velocity * 2
         if keys[pygame.K_RIGHT]:
             playerList[index].new_coords[0] += tick * playerList[index].velocity * 2
         if keys[pygame.K_LEFT]:
             playerList[index].new_coords[0] -= tick * playerList[index].velocity * 2
+        # Проверка на выход за границы поля
         if playerList[index].new_coords[0] > sizeX - playerList[index].rect[2]:
             playerList[index].new_coords[0] = sizeX - playerList[index].rect[2]
         elif playerList[index].new_coords[0] < 0:
@@ -680,13 +685,19 @@ def game_screen(points, level):
         elif playerList[index].new_coords[1] < 0:
             playerList[index].new_coords[1] = 0
         for i in player:
+            # Движение фигур игрока, кроме ведомой
             if i != playerList[index]:
                 i.move(tick)
         for i in evil:
+            # Движение фигур компьютера
             i.move(tick)
         player.update()
         evil.update()
         for i in player:
+            # Проверка столкновения фигур-союзников.
+            # Столкнувшиеся фигуры отталкиваются друг от друга на некоторе расстояние.
+            # Расстояние зависит от скорости движения фигуры и массы.
+            # Ведомая фигура не отскакивает
             if i != playerList[index]:
                 player.remove(i)
                 for j in pygame.sprite.spritecollide(i, player, False):
@@ -695,6 +706,7 @@ def game_screen(points, level):
                 player.add(i)
         player.update()
         for i in evil:
+            # Проверка столкновения фигур-союзников компьютера
             evil.remove(i)
             if pygame.sprite.spritecollideany(i, evil):
                 for j in pygame.sprite.spritecollide(i, evil, False):
@@ -703,6 +715,7 @@ def game_screen(points, level):
             evil.add(i)
         evil.update()
         for i in player:
+            # Проверка столкновения врагов
             if pygame.sprite.spritecollideany(i, evil):
                 for j in pygame.sprite.spritecollide(i, evil, False):
                     collisionSound.play()
@@ -712,7 +725,7 @@ def game_screen(points, level):
                             if delet == i:
                                 player.remove(i)
                                 create_particles(i.rect[:2], 'killStar.png')
-                                should_write[0][1] -= i.velocity * 2
+                                should_write[0][1] -= i.velocity * 2  # Уменьшение очков.
                             else:
                                 should_write[0][1] += j.velocity * 2
                                 create_particles(j.rect[:2], 'killStar.png')
@@ -728,16 +741,21 @@ def game_screen(points, level):
         screen2.fill((100, 100, 100))
         screen.blit(screen2, playerList[index].rect[:2])
         if len(player) == 0 or len(evil) == 0:
+            # Конец раунда
             index = 0
-            was += 1
+            was += 1  # Изменение кол-ва сыгрынных раундов
             player, evil = pygame.sprite.Group(), pygame.sprite.Group()
-            if was == 12:
+            if was == 12:  # Конец 12 раундов, т.е. 1 игры
+                # К старым очкам игрока прибавляются новые.
+                # Если в результате игрок уходит в минус, то его счет обнуляется
                 points = max(points + should_write[0][1], 0)
                 if should_write[0][1] > 0:
                     level += 1
-                if finish_screen():
+                if finish_screen():  # Экран завершения игры
+                    # Возвращение на главное меню
                     return points, level
                 clock.tick()
+                # Обновление параметров
                 pygame.mixer.music.play(-1)
                 player = pygame.sprite.Group()
                 evil = pygame.sprite.Group()
@@ -749,12 +767,14 @@ def game_screen(points, level):
                 if setting_screen(player, evil, playerList, screen2, should_write):
                     return points, level
             else:
+                # Расстановка фигур на исходные позиции
                 for i in playerList:
                     i.restart(evil)
                     player.add(i)
                 for i in evilList:
                     i.restart(player)
                     evil.add(i)
+                # Смена пордка атаки фигур компьютера
                 evilShuffle(evil)
         exit.draw(screen)
         player.draw(screen)
@@ -768,16 +788,31 @@ def game_screen(points, level):
 
 def finish_screen():
     while True:
+        # Вывод результатов за 12 раундов
         screen.blit(background, (0, 0))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 create_particles(event.pos, 'star.png')
-                pygame.mixer.music.play(-1)
                 return exit.get_click(event.pos)
         pygame.mixer.music.fadeout(2000)
-        showResult()
+        if should_write[0][1] < 0:
+            loseSound.play()
+            pygame.draw.rect(screen, (255, 0, 0), (3 * sizeX // 8, 3 * sizeY // 8, sizeX // 4, sizeY // 4))
+        elif should_write[0][1] == 0:
+            loseSound.play()
+            pygame.draw.rect(screen, (0, 0, 255), (3 * sizeX // 8, 3 * sizeY // 8, sizeX // 4, sizeY // 4))
+        else:
+            winSound.play()
+            pygame.draw.rect(screen, (0, 255, 0), (3 * sizeX // 8, 3 * sizeY // 8, sizeX // 4, sizeY // 4))
+        font = pygame.font.SysFont('Times New Roman', 30)
+        text = font.render('points: ' + str(should_write[0][1]), 1, (255, 255, 255))
+        screen.blit(text, (3 * sizeX // 8 + (sizeX // 4 - text.get_rect()[2]) // 2,
+                           3 * sizeY // 8 + (sizeY // 8 - text.get_rect()[3]) // 2))
+        text = font.render('level: ' + str(level), 1, (255, 255, 255))
+        screen.blit(text, (3 * sizeX // 8 + (sizeX // 4 - text.get_rect()[2]) // 2,
+                           4 * sizeY // 8 + (sizeY // 8 - text.get_rect()[3]) // 2))
         exit.draw(screen)
         pygame.display.flip()
 
@@ -819,10 +854,6 @@ Diapason(diapason, (425, 0), load_image('120.png'), 120)
 Diapason(diapason, (575, 0), load_image('160.png'), 160)
 Diapason(diapason, (725, 0), load_image('200.png'), 200)
 should_write = [[(sizeX // 2, 0), 0]]
-index = 0
-was = 0
-state = 3
-ok, full, choose_diapason = False, False, False
 clock = pygame.time.Clock()
 if not os.path.exists('data/4/king.png'):
     for i in range(4, 17):
@@ -832,11 +863,11 @@ if not os.path.exists('data/4/king.png'):
         create_images(i, 'kinge.png')
         create_images(i, 'soldier.png')
         create_images(i, 'soldiere.png')
-
 set_skins(17)
 exit = Exit(skins)
 background = pygame.transform.scale(load_image('newbackground.jpg'), (sizeX, sizeY))
 while running:
+    # Экран главного меню
     screen.blit(background, (0, 0))
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -848,6 +879,7 @@ while running:
             answer = ''
             for i in menu:
                 if i.get_name() == 'Sound':
+                    # Изменение громкости
                     sound_volume = i.get_click(event.pos)
                     pygame.mixer.music.set_volume(sound_volume)
                     winSound.set_volume(0.5 * sound_volume)
@@ -855,10 +887,13 @@ while running:
                     loseSound.set_volume(sound_volume)
                 elif i.get_click(event.pos):
                     if i.get_name() == 'SkinMenu':
+                        # Переход в магазин
                         points, localpath = skin_screen(points, localpath)
                     elif i.get_name() == 'Rules':
+                        # Просмотр правил
                         rules_screen()
                     elif i.get_name() == 'ButtonStart':
+                        # Начало игры
                         points, level = game_screen(points, level)
     particles_sprites.update()
     particles_sprites.draw(screen)
